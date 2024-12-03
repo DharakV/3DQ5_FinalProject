@@ -1,11 +1,12 @@
 `ifndef DEFINE_STATE
 
 // This defines the states
-typedef enum logic [1:0] {
+typedef enum logic [2:0] {
 	S_IDLE,
 	S_ENABLE_UART_RX,
 	S_WAIT_UART_RX,
-    S_top_m1
+    S_top_m1,
+	S_top_m2
 } top_state_type;
 
 typedef enum logic [1:0] {
@@ -62,8 +63,89 @@ typedef enum logic [4:0] {
 	common_case_4,
 	common_case_5,
 	common_case_6,
+	//7 lead out cases
+	lead_out_0,
+	lead_out_1,
+	lead_out_2,
+	lead_out_3,
+	lead_out_4,
+	lead_out_5,
+	lead_out_6,
+	final_state,
 	milestone1_done
 } milestone_state_type;
+
+typedef enum logic [6:0]{
+	m2_idle,
+	fill_lead_in0,
+	fill_lead_in1,
+	fill_lead_in2,
+	fill_lead_in3,
+	fill_lead_in4,
+	fill_lead_in5,
+	fill_lead_in6,
+	fill_lead_in7,
+	fill_lead_in8,
+	fill_lead_in9,
+	fill_lead_in10,
+	fill_lead_in11,
+	fill_CC0,
+	fill_CC1,
+	fill_CC2,
+	fill_CC3,
+	fill_CC4,
+	fill_CC5,
+	fill_CC6,
+	fill_CC7,
+	fill_lead_out0,
+	fill_lead_out1,
+	fill_lead_out2,
+	fill_lead_out3,
+	fill_lead_out4,
+	fill_lead_out5,
+	fill_lead_out6,
+	fill_lead_out7,
+	t_calc_lead_in0,
+	t_calc_lead_in1,
+	t_calc_lead_in2,
+	t_calc_lead_in3,
+	t_calc_lead_in4,
+	t_calc_lead_in5,
+	t_calc_lead_in6,
+	t_calc_lead_in7,
+	t_calc_lead_in8,
+	t_calc_lead_in9,
+	t_calc_lead_in10,
+	t_calc_CC_0,
+	t_calc_CC_1,
+	t_calc_CC_2,
+	t_calc_CC_3,
+	t_calc_CC_4,
+	t_calc_CC_5,
+	t_calc_CC_6,
+	t_calc_CC_7,
+	S_calc_lead_in0,
+	S_calc_lead_in1,
+	S_calc_lead_in2,
+	S_calc_lead_in3,
+	S_calc_lead_in4,
+	S_calc_lead_in5,
+	S_calc_lead_in6,
+	S_calc_lead_in7,
+	S_calc_lead_in8,
+	S_calc_lead_in9,
+	S_calc_lead_in10,
+	S_calc_CC0,
+	S_calc_CC1,
+	S_calc_CC2,
+	S_calc_CC3,
+	S_calc_CC4,
+	S_calc_CC5,
+	S_calc_CC6,
+	S_calc_CC7,
+	m2_final_state
+
+} m2_state_type;
 
 
 

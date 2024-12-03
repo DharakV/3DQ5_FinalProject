@@ -33,6 +33,7 @@ module milestone1(
 milestone_state_type milestone1; //initailize from header file
 
 logic [8:0] counter;
+logic [7:0] counter_vert;
 
 //initalize registers for U,V,Y and RGB 
 logic [7:0] reg_u [5:0]; //shift register for u values
@@ -43,6 +44,12 @@ logic read_cycle_en; //to keep track of whether we need to incriment address for
 logic [7:0] value_R;
 logic [7:0] value_G;
 logic [7:0] value_B;
+logic [31:0] clip_R;
+logic [31:0] clip_G;
+logic [31:0] clip_B;
+logic [31:0] clip_R_p;
+logic [31:0] clip_G_p;
+logic [31:0] clip_B_p;
 logic [31:0] matrix_value_y;
 logic [31:0] matrix_value_u;
 logic [31:0] matrix_value_v;
@@ -66,7 +73,12 @@ logic [31:0] mult2_op1;
 logic [31:0] mult2_op2;
 logic [31:0] mult3_op1;
 logic [31:0] mult3_op2;
-
+logic [31:0] temp_R_p;
+logic [31:0] temp_G_p;
+logic [31:0] temp_B_p;
+logic [31:0] temp_R;
+logic [31:0] temp_G;
+logic [31:0] temp_B;
 logic signed [31:0] mult1_out;
 logic signed [31:0] mult2_out;
 logic signed [31:0] mult3_out;
@@ -102,6 +114,41 @@ Multiplier mult3(
 	.Mult_result(mult3_out)
 );
 
+always_comb begin
+  	temp_R_p = mult1_out + mult2_out;
+  	temp_G_p = matrix_value_y + mult1_out + mult2_out;
+	temp_B_p = matrix_value_y + mult3_out;
+	clip_R_p = {{16{temp_R_p[31]}} , temp_R_p[31:16]};
+	clip_G_p = {{16{temp_G_p[31]}} , temp_G_p[31:16]};
+	clip_B_p = {{16{temp_B_p[31]}} , temp_B_p[31:16]};
+ 
+	if ($signed(clip_B_p) > 32'sd255) begin
+		clip_B = 8'd255;
+	end else if ($signed(clip_B_p) < 8'sd0) begin
+		clip_B = 8'd0;
+  	end else begin
+    	clip_B = clip_B_p;
+  	end
+  
+	if ($signed(clip_G_p) > 32'sd255) begin
+		clip_G = 8'd255;
+	end else if ($signed(clip_G_p) < 8'sd0) begin
+		clip_G = 8'd0;
+  	end else begin
+    	clip_G = clip_G_p;
+  	end
+  
+	if ($signed(clip_R_p) > 32'sd255) begin
+		clip_R = 8'd255;
+	end else if ($signed(clip_R_p) < 8'sd0) begin
+		clip_R = 8'd0;
+  	end else begin
+    	clip_R = clip_R_p;
+  	end
+
+end
+
+
 always @(posedge CLOCK_50_I or negedge Resetn) begin
 	if (~Resetn) begin
 	//initailize all variables and registers as base values
@@ -113,7 +160,7 @@ always @(posedge CLOCK_50_I or negedge Resetn) begin
 		matrix_value_v <= 8'd0;
 		value_u_prime <= 32'd0;
 		value_v_prime <= 32'd0;
-		read_cycle_en <= 16'd0;
+		read_cycle_en <= 1'd0;
 
 		address_y <= 18'd0;
 		address_u <= 18'd38400;
@@ -122,10 +169,6 @@ always @(posedge CLOCK_50_I or negedge Resetn) begin
 
 		reg_y[0] <= 8'd0;
 		reg_y[1] <= 8'd0;
-		reg_y[2] <= 8'd0;
-		reg_y[3] <= 8'd0;
-		reg_y[4] <= 8'd0;
-		reg_y[5] <= 8'd0;
 
 		reg_u[0] <= 8'd0;
 		reg_u[1] <= 8'd0;
@@ -154,6 +197,8 @@ always @(posedge CLOCK_50_I or negedge Resetn) begin
 		signed_132251 <= 32'd132251;
 
 		counter <= 9'd0;
+		counter_vert <= 8'd0;
+		milestone1_finish <= 1'd0;
 		milestone1 <= idle;
 		
 	end else begin
@@ -162,6 +207,7 @@ always @(posedge CLOCK_50_I or negedge Resetn) begin
 			
 			idle: begin
 			 if(start_bit)begin
+			 	write_en_n <= 1'b1;
 			   milestone1 <= lead_in_0;
 			 end
 			end
@@ -179,6 +225,7 @@ always @(posedge CLOCK_50_I or negedge Resetn) begin
 			lead_in_1: begin
 
 				address <= address_v;
+				
 				address_v <= address_v + 18'd1;
 
 				milestone1 <= lead_in_2;
@@ -197,12 +244,13 @@ always @(posedge CLOCK_50_I or negedge Resetn) begin
 			lead_in_3: begin
 
 				address <= address_u;
-				address_u <= address_u + 18'd1; 
 				
-				reg_v[5] <= SRAM_read_data[15:8];
-				reg_v[4] <= SRAM_read_data[15:8];
-				reg_v[3] <= SRAM_read_data[15:8];
-				reg_v[2] <=	SRAM_read_data[7:0];
+				reg_v[0] <= SRAM_read_data[15:8];
+				reg_v[1] <= SRAM_read_data[15:8];
+				reg_v[2] <= SRAM_read_data[15:8];
+				reg_v[3] <=	SRAM_read_data[7:0];
+				
+				address_u <= address_u + 18'd1; 
 				
 				milestone1 <= lead_in_4;
 			
@@ -213,8 +261,8 @@ always @(posedge CLOCK_50_I or negedge Resetn) begin
 				address <= address_y;
 				address_y <= address_y + 18'd1;
 				
-				reg_v[1] <= SRAM_read_data[15:8];
-				reg_v[0] <= SRAM_read_data[7:0];
+				reg_v[4] <= SRAM_read_data[15:8];
+				reg_v[5] <= SRAM_read_data[7:0];
 				
 				milestone1 <= lead_in_5;
 				
@@ -231,10 +279,10 @@ always @(posedge CLOCK_50_I or negedge Resetn) begin
 				mult3_op1 <= signed_159;
 				mult3_op2 <= (reg_v[2] + reg_v[3]);
 			
-				reg_u[5] <= SRAM_read_data[15:8];
-				reg_u[4] <= SRAM_read_data[15:8];
-				reg_u[3] <= SRAM_read_data[15:8];
-				reg_u[2] <=	SRAM_read_data[7:0];
+				reg_u[0] <= SRAM_read_data[15:8];
+				reg_u[1] <= SRAM_read_data[15:8];
+				reg_u[2] <= SRAM_read_data[15:8];
+				reg_u[3] <=	SRAM_read_data[7:0];
 				
 				milestone1 <= lead_in_6;
 				
@@ -245,8 +293,8 @@ always @(posedge CLOCK_50_I or negedge Resetn) begin
 			  //finish computation for V'
 				value_v_prime <= (mult1_out + mult2_out + mult3_out + signed_128) >>> 8;  
 			  
-				reg_u[1] <= SRAM_read_data[15:8];
-				reg_u[0] <= SRAM_read_data[7:0];
+				reg_u[4] <= SRAM_read_data[15:8];
+				reg_u[5] <= SRAM_read_data[7:0];
 				
 				milestone1 <= lead_in_7;
 			
@@ -272,16 +320,17 @@ always @(posedge CLOCK_50_I or negedge Resetn) begin
 			
 			common_case_0: begin
         
-       			 //finish computation for U'
+       		//finish computation for U'
 				value_u_prime <= (mult1_out + mult2_out + mult3_out + signed_128) >>> 8; 
 				
 				//enable reading -> read (Veven, Vodd) values -> stores values in reg_v register
 				write_en_n <= 1'b1;	
 				address <= address_v;
-
-				if (read_cycle_en) begin
+				
+				if (read_cycle_en && counter <  9'd310) begin
 					address_v <= address_v + 18'd1;
 				end
+
 
 				//Y matrix calculation for R value
 				//the output of this multiplication will be available in the next cycle
@@ -303,16 +352,15 @@ always @(posedge CLOCK_50_I or negedge Resetn) begin
 				write_en_n <= 1'b1;
 				address <= address_u;
 				
-				if (read_cycle_en) begin
+				if (read_cycle_en && counter <  9'd310) begin
 					address_u <= address_u + 18'd1;
-					
 				end
 				
 				//use mutlipler output from previous cycle to finalize R value
 				matrix_value_y <= mult1_out;
 				matrix_value_v <= mult2_out;
-				value_R <= (mult1_out + mult2_out) >>> 16; //shifting 16 bits to the right is equivalent to dividing by 2^16
-			
+				
+				
 				//U matrix calculation for G value
 				mult1_op1 <= signed_neg_25624;
 				mult1_op2 <= (reg_u[2] - signed_128);
@@ -324,7 +372,10 @@ always @(posedge CLOCK_50_I or negedge Resetn) begin
 				//U matrix calculation for B value
 				mult3_op1 <= signed_132251;
 				mult3_op2 <= (reg_u[2] - signed_128);
-
+				
+				//value_R <= ((mult1_out + mult2_out) >>> 16);
+        value_R <= clip_R; 
+        
 				milestone1 <= common_case_2;
 
 			end
@@ -334,16 +385,18 @@ always @(posedge CLOCK_50_I or negedge Resetn) begin
 				//use mutliplier output from previous cycle to finalize G value
 				matrix_value_u <= mult1_out;
 				matrix_value_v <= mult2_out;
-				value_G <= (matrix_value_y + mult1_out + mult2_out) >>> 16;
-
+				
 				//use mutliplier output from previous cycle to finalize B value
 				matrix_value_u <= mult3_out;
-				value_B <= (matrix_value_y + mult3_out) >>> 16;
-
+				
 				//write R and G values to SRAM
 				write_en_n <= 1'b0;
 				address <= address_RGB;
-				write_data <= {value_R, {((matrix_value_y + mult1_out + mult2_out) >>> 16)}[7:0]};
+	
+				write_data <= {value_R[7:0], clip_G[7:0]};
+          
+				//write_data <= {{value_R}[7:0], {((matrix_value_y + mult1_out + mult2_out) >>> 16)}[7:0]};
+
 				address_RGB <= address_RGB + 18'd1;
 
 				//compute V' for odd RGB value	
@@ -356,13 +409,16 @@ always @(posedge CLOCK_50_I or negedge Resetn) begin
 				mult3_op1 <= signed_159;
 				mult3_op2 <= (reg_v[2] + reg_v[3]);
 				
+				//value_B <= ((matrix_value_y + mult3_out) >>> 16);
+				value_B <= clip_B;
+				
 				milestone1 <= common_case_3;
 				
 			end
 			
 			common_case_3: begin
 			  
-        		write_en_n <= 1'b1;
+      		write_en_n <= 1'b1;
 				//finalize V' values and start computing U' for odd RGB values	
 
 				//finialize V' computation using mutliplier outputs from previous cycle
@@ -385,26 +441,43 @@ always @(posedge CLOCK_50_I or negedge Resetn) begin
 				//index 2 == V(j-1/2)
 				//index 3 == V(j+1/2)
 				//index 4 == V(j+3/2)
+
 				//index 5 == V(j+5/2)
 				//need to create a buffer register and shift only 1 out of 2 of the SRAM values into this register per cycle
-				if(read_cycle_en)begin
-				  reg_v[5] <= SRAM_read_data[7:0];
-				  reg_v[3] <= reg_v[4];
-				  reg_v[2] <= reg_v[3];
-				  reg_v[1] <= reg_v[2];
-				  reg_v[0] <= reg_v[1];
-				end else begin
-				  reg_v[5] <= SRAM_read_data[15:8];
-				  reg_v[3] <= reg_v[4];
-				  reg_v[2] <= reg_v[3];
-				  reg_v[1] <= reg_v[2];
-				  reg_v[0] <= reg_v[1];
-				end
 				
+				if (counter <= 9'd310) begin
+				
+					if(read_cycle_en) begin
+						reg_v[0] <= reg_v[1];
+						reg_v[1] <= reg_v[2];
+						reg_v[2] <= reg_v[3];
+						reg_v[3] <= reg_v[4];
+						reg_v[4] <= reg_v[5];
+						reg_v[5] <= SRAM_read_data[7:0];
+
+					end else begin
+						reg_v[0] <= reg_v[1];
+						reg_v[1] <= reg_v[2];
+						reg_v[2] <= reg_v[3];
+						reg_v[3] <= reg_v[4];
+						reg_v[4] <= reg_v[5];
+						reg_v[5] <= SRAM_read_data[15:8];
+					end
+					
+				end else begin
+					reg_v[0] <= reg_v[1];
+					reg_v[1] <= reg_v[2];
+					reg_v[2] <= reg_v[3];
+					reg_v[3] <= reg_v[4];
+					reg_v[4] <= reg_v[5];
+				end
 
 				//initiate read for new Y values
 				address <= address_y;
-
+				
+				if (counter < 9'd319) begin
+		    		address_y <= address_y + 18'd1;
+  	     end
 				milestone1 <= common_case_4;
 
 			end
@@ -413,20 +486,6 @@ always @(posedge CLOCK_50_I or negedge Resetn) begin
 			 
 				value_u_prime <= (mult1_out + mult2_out + mult3_out + signed_128) >>> 8; 
 
-				if(read_cycle_en)begin
-				  reg_u[5] <= SRAM_read_data[7:0];
-				  reg_u[3] <= reg_u[4];
-				  reg_u[2] <= reg_u[3];
-				  reg_u[1] <= reg_u[2];
-				  reg_u[0] <= reg_u[1];
-				end else begin
-				  reg_u[5] <= SRAM_read_data[15:8];
-				  reg_u[3] <= reg_u[4];
-				  reg_u[2] <= reg_u[3];
-				  reg_u[1] <= reg_u[2];
-				  reg_u[0] <= reg_u[1];
-				end
-
 				//Y matrix calculation for R value
 				mult1_op1 <= signed_76284;
 				mult1_op2 <= (reg_y[0] - signed_16);
@@ -434,18 +493,47 @@ always @(posedge CLOCK_50_I or negedge Resetn) begin
 				//V matrix calculation for R value
 				mult2_op1 <= signed_104595;
 				mult2_op2 <= (value_v_prime - signed_128);
+				
+				if (counter <= 9'd310) begin
+				
+					if(read_cycle_en) begin
+						reg_u[0] <= reg_u[1];
+						reg_u[1] <= reg_u[2];
+						reg_u[2] <= reg_u[3];
+						reg_u[3] <= reg_u[4];
+						reg_u[4] <= reg_u[5];
+						reg_u[5] <= SRAM_read_data[7:0];
 
+					end else begin
+						reg_u[0] <= reg_u[1];
+						reg_u[1] <= reg_u[2];
+						reg_u[2] <= reg_u[3];
+						reg_u[3] <= reg_u[4];
+						reg_u[4] <= reg_u[5];
+						reg_u[5] <= SRAM_read_data[15:8];
+					end
+					
+				end else begin
+				
+					reg_u[0] <= reg_u[1];
+					reg_u[1] <= reg_u[2];
+					reg_u[2] <= reg_u[3];
+					reg_u[3] <= reg_u[4];
+					reg_u[4] <= reg_u[5];
+					
+				end
 				milestone1 <= common_case_5;
 
 			end
 
 			common_case_5: begin
 
+				
 				//use mutlipler output from previous cycle to finalize R value
 				matrix_value_y <= (mult1_out);
 				matrix_value_v <= (mult2_out);
-				value_R <= (mult1_out + mult2_out) >>> 16; //shifting 16 bits to the right is equivalent to dividing by 2^16
-			
+				
+				
 				//U matrix calculation for G value
 				mult1_op1 <= signed_neg_25624;
 				mult1_op2 <= (value_u_prime - signed_128);
@@ -461,7 +549,14 @@ always @(posedge CLOCK_50_I or negedge Resetn) begin
 				//write B and R values to SRAM
 				write_en_n <= 1'b0;
 				address <= address_RGB;
-				write_data <= {value_B, {((mult1_out + mult2_out) >>> 16)}[7:0]};
+				
+				
+				write_data <= {value_B[7:0], clip_R[7:0]};
+          
+				
+				
+				//write_data <= {{value_B}[7:0], {((mult1_out + mult2_out) >>> 16)}[7:0]};
+
 				address_RGB <= address_RGB + 18'd1;
 
 				//incriment counter everytime we write a B value, so we know when to exit the common_case loop
@@ -476,38 +571,263 @@ always @(posedge CLOCK_50_I or negedge Resetn) begin
 				//use mutliplier output from previous cycle to finalize G value
 				matrix_value_u <= (mult1_out);
 				matrix_value_v <= (mult2_out);
-				value_G <= (matrix_value_y + mult1_out + mult2_out) >>> 16;
-
+				
 				//use mutliplier output from previous cycle to finalize B value
 				matrix_value_u <= (mult3_out);
-				value_B <= (matrix_value_y + mult3_out ) >>> 16;
-
+				
 				//write G and B values to SRAM
 				write_en_n <= 1'b0;
 				address <= address_RGB;
-				write_data <= {{((matrix_value_y + mult1_out + mult2_out) >>> 16)}[7:0], {((matrix_value_y + mult3_out) >>> 16)}[7:0]};
+				
+				write_data <= {clip_G[7:0], clip_B[7:0]};
+          
+				//write_data <= {{((matrix_value_y + mult1_out + mult2_out) >>> 16)}[7:0], {((matrix_value_y + mult3_out) >>> 16)}[7:0]};
+
 				address_RGB <= address_RGB + 18'd1;
+				counter <= counter + 9'd1;
 
 				//store the y values from the read we initiated 3 cycles ago
-				reg_y[1] = SRAM_read_data[15:8];
-				reg_y[0] = SRAM_read_data[7:0];
+				reg_y[1] <= SRAM_read_data[15:8];
+				reg_y[0] <= SRAM_read_data[7:0];
 
 				//flip the read_cycle_en bit so we do/do not read V and U values on the next cycle
 				read_cycle_en <= ~read_cycle_en;
 			
-				if (counter < 9'd319) begin
+				if (counter < 9'd317) begin
 
 					milestone1 <= common_case_0;
 
 				end else begin
 				 
-					if (counter >= 9'd319) begin
-					   milestone1 <= milestone1_done;
+					if (counter >= 9'd317) begin
+					   milestone1 <= lead_out_0;
 					   
 					end
 					 
 				end
+		
+			end
+			
+			lead_out_0: begin
+			  write_en_n <= 1'd1;
+				//Y matrix calculation for R value
+				//the output of this multiplsim:/tb_project_v2/#INITIAL#250ication will be available in the next cycle
+				mult1_op1 <= signed_76284;
+				mult1_op2 <= (reg_y[1] - signed_16);
+			
+				//V matrix calculation for R value
+				//the output of this multiplication will be available in the next cycle
+				mult2_op1 <= signed_104595;
+				mult2_op2 <= (reg_v[2] - signed_128);
 				
+				milestone1 <= lead_out_1;
+			  
+			end
+			
+			lead_out_1: begin
+			  
+			  //use mutlipler output from previous cycle to finalize R value
+				matrix_value_y <= mult1_out;
+				matrix_value_v <= mult2_out;
+				
+				//U matrix calculation for G value
+				mult1_op1 <= signed_neg_25624;
+				mult1_op2 <= (reg_u[2] - signed_128);
+
+				//V matrix calculation for G value
+				mult2_op1 <= signed_neg_53281;
+				mult2_op2 <= (reg_v[2] - signed_128);
+
+				//U matrix calculation for B value
+				mult3_op1 <= signed_132251;
+				mult3_op2 <= (reg_u[2] - signed_128);
+		
+				value_R <= ((mult1_out + mult2_out) >>> 16); 
+				
+				milestone1 <= lead_out_2;
+
+			end
+			
+			lead_out_2: begin
+			
+				write_en_n <= 1'd0;
+				//use mutliplier output from previous cycle to finalize G value
+				matrix_value_u <= mult1_out;
+				matrix_value_v <= mult2_out;
+				
+				//use mutliplier output fromsim:/tb_project_v2/#INITIAL#250 previous cycle to finalize B value
+				matrix_value_u <= mult3_out;
+			
+				//write R and G values to SRAM
+				write_en_n <= 1'b0;
+				address <= address_RGB;
+				
+				write_data <= {value_R[7:0], clip_G[7:0]};
+          
+				//write_data <= {{value_R}[7:0], {((matrix_value_y + mult1_out + mult2_out) >>> 16)}[7:0]};
+
+				address_RGB <= address_RGB + 18'd1;
+
+				//compute V' for odd RGB value	
+				mult1_op1 <= signed_21;
+				mult1_op2 <= (reg_v[0] + reg_v[5]); //the u values we require will always be at the start and end of our register
+				
+				mult2_op1 <= signed_neg_52;
+				mult2_op2 <= (reg_v[1] + reg_v[4]);
+				
+				mult3_op1 <= signed_159;
+				mult3_op2 <= (reg_v[2] + reg_v[3]);
+				
+				value_B <= ((matrix_value_y + mult3_out) >>> 16);
+				
+				milestone1 <= lead_out_3;
+			end
+			
+			lead_out_3: begin
+				write_en_n <= 1'd1;
+				value_v_prime <= (mult1_out + mult2_out + mult3_out + signed_128) >>> 8; 
+
+				//fill multipliers with new values to compute odd U'
+				mult1_op1 <= signed_21;
+				mult1_op2 <=(reg_u[0] + reg_u[5]); //the u values we require will always be at the start and end of our register
+				
+				mult2_op1 <= signed_neg_52; 
+				mult2_op2 <= (reg_u[1] + reg_u[4]);
+				
+				mult3_op1 <= signed_159;
+				mult3_op2 <= (reg_u[2] + reg_u[3]);
+				
+				if(read_cycle_en) begin
+					reg_v[0] <= reg_v[1];
+					reg_v[1] <= reg_v[2];
+					reg_v[2] <= reg_v[3];
+					reg_v[3] <= reg_v[4];
+					reg_v[4] <= reg_v[5];
+					reg_v[5] <= SRAM_read_data[7:0];
+
+				end else begin
+					reg_v[0] <= reg_v[1];
+					reg_v[1] <= reg_v[2];
+					reg_v[2] <= reg_v[3];
+					reg_v[3] <= reg_v[4];
+					reg_v[4] <= reg_v[5];
+					reg_v[5] <= SRAM_read_data[15:8];
+				end
+				
+				milestone1 <= lead_out_4;
+				
+			end
+			
+			lead_out_4: begin
+			  
+			  value_u_prime <= (mult1_out + mult2_out + mult3_out + signed_128) >>> 8; 
+
+				//Y matrix calculation for R value
+				mult1_op1 <= signed_76284;
+				mult1_op2 <= (reg_y[0] - signed_16);
+			
+				//V matrix calculation for R value
+				mult2_op1 <= signed_104595;
+				mult2_op2 <= (value_v_prime - signed_128);
+				
+				if(read_cycle_en) begin
+					reg_u[0] <= reg_u[1];
+					reg_u[1] <= reg_u[2];
+					reg_u[2] <= reg_u[3];
+					reg_u[3] <= reg_u[4];
+					reg_u[4] <= reg_u[5];
+					reg_u[5] <= SRAM_read_data[7:0];
+
+				end else begin
+					reg_u[0] <= reg_u[1];
+					reg_u[1] <= reg_u[2];
+					reg_u[2] <= reg_u[3];
+					reg_u[3] <= reg_u[4];
+					reg_u[4] <= reg_u[5];
+					reg_u[5] <= SRAM_read_data[15:8];
+				end
+				
+				milestone1 <= lead_out_5;
+			end
+			
+			lead_out_5: begin
+				write_en_n <= 1'd0;
+			  //use mutlipler output from previous cycle to finalize R value
+				matrix_value_y <= (mult1_out);
+				matrix_value_v <= (mult2_out);
+				
+				//U matrix calculation for G value
+				mult1_op1 <= signed_neg_25624;
+				mult1_op2 <= (value_u_prime - signed_128);
+
+				//V matrix calculation for G value
+				mult2_op1 <= signed_neg_53281;
+				mult2_op2 <= (value_v_prime - signed_128);
+
+				//U matrix calculation for B value
+				mult3_op1 <= signed_132251;
+				mult3_op2 <= (value_u_prime - signed_128);
+
+				//write B and R values to SRAM
+				write_en_n <= 1'b0;
+				address <= address_RGB;
+				
+				write_data <= {value_B[7:0], clip_R[7:0]};
+         
+				//write_data <= {{value_B}[7:0], {((mult1_out + mult2_out) >>> 16)}[7:0]};
+
+				address_RGB <= address_RGB + 18'd1;
+				
+				counter <= counter + 9'd1;
+				
+				milestone1 <= lead_out_6;
+			end
+			
+			lead_out_6: begin
+			
+			  //use mutliplier output from previous cycle to finalize G value
+				matrix_value_u <= (mult1_out);
+				matrix_value_v <= (mult2_out);
+				
+				//use mutliplier output from previous cycle to finalize B value
+				matrix_value_u <= (mult3_out);
+				
+				//write G and B values to SRAM
+				write_en_n <= 1'b0;
+				address <= address_RGB;
+				
+				write_data <= {clip_G[7:0], clip_B[7:0]};
+          
+				address_RGB <= address_RGB + 18'd1;
+				
+				address_v <= address_v + 18'd1;
+				address_u <= address_u + 18'd1;
+				
+				read_cycle_en <= 1'd0;
+				
+				counter_vert <= counter_vert + 8'd1;
+				
+				//store the y values from the read we initiated 3 cycles ago
+				reg_y[1] <= SRAM_read_data[15:8];
+				reg_y[0] <= SRAM_read_data[7:0];
+				
+				counter <= 9'd0;
+				
+				if (counter_vert < 8'd239) begin
+
+					milestone1 <= lead_in_0;
+
+				end else begin
+				
+					milestone1 <= final_state;
+				 
+				end
+			end
+			
+			final_state: begin
+				write_en_n <= 1'b1;
+				milestone1_finish <= 1'b1;
+				milestone1 <= idle;
 			end
 			
 			default: milestone1 <= idle;
@@ -515,5 +835,5 @@ always @(posedge CLOCK_50_I or negedge Resetn) begin
 			
 		end
 	end
-//**** use finish state and send to top FSM ****
+
 endmodule

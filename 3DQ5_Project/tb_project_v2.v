@@ -35,13 +35,14 @@ you will get false errors, so use the original testbench instead.
 
 // file for comparison
 // to test milestone 2 independently, use the .sram_d1 file to check the output
-`define VERIFICATION_FILE_NAME "motorcycle.sram_d0"
+//`define VERIFICATION_FILE_NAME "motorcycle.sram_d0"
+`define VERIFICATION_FILE_NAME "motorcycle.sram_d1"
 
 //// for milestone 1
-`define INPUT_FILE_NAME "motorcycle.sram_d1"
+//`define INPUT_FILE_NAME "motorcycle.sram_d1"
 
 //// for milestone 2
-//`define INPUT_FILE_NAME "motorcycle.sram_d2"
+`define INPUT_FILE_NAME "motorcycle.sram_d2"
 
 //// for milestone 3 (completed project)
 //`define INPUT_FILE_NAME "motorcycle.mic13”
@@ -189,7 +190,8 @@ begin
 	
 	//NOTE: this is for milestone 1, in different milestones we will be
 	//writing to different regions so modify as needed
-	for (i=146944; i<262144; i=i+1) begin
+	//for (i=146944; i<262144; i=i+1) begin
+	for (i=0; i<76800; i=i+1) begin
 		if (SRAM_ARRAY_write_count[i]==0) begin
 			if (error_count < `MAX_MISMATCHES) begin
 				$write("error: did not write to location %d (%x hex)\n", i, i);

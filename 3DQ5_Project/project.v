@@ -6,17 +6,6 @@ McMaster University
 Ontario, Canada
 */
 
-
-
-/* notes
-
-add a finish state for this TOP FSM to let it know that milestone 1 is complete
-
-*/
-
-
-
-
 `timescale 1ns/100ps
 
 `ifndef DISABLE_DEFAULT_NET
@@ -170,6 +159,23 @@ milestone1 m1_unit(
 	.milestone1_finish(m1_finish)
 );
 
+logic [15:0] m2_write_data;
+logic [17:0] m2_address;
+logic m2_start;
+logic m2_write_en_n;
+logic m2_finish;
+
+milestone2 m2_unit(
+	.CLOCK_50_I(CLOCK_50_I),
+	.Resetn(resetn), 
+	.m2_start(m2_start), //for leaving idle state
+	.SRAM_read_data(SRAM_read_data),
+	.SRAM_write_data(m2_write_data),
+	.SRAM_address(m2_address),
+	.write_en_n(m2_write_en_n),
+	.m2_finish(m2_finish)
+);
+
 // SRAM unit
 SRAM_Controller SRAM_unit (
 	.Clock_50(CLOCK_50_I),
@@ -201,7 +207,9 @@ always @(posedge CLOCK_50_I or negedge resetn) begin
 		UART_timer <= 26'd0;
 		
 		VGA_enable <= 1'b1;
+
 	end else begin
+
 		UART_rx_initialize <= 1'b0; 
 		UART_rx_enable <= 1'b0; 
 		
@@ -211,8 +219,11 @@ always @(posedge CLOCK_50_I or negedge resetn) begin
 		else UART_timer <= UART_timer + 26'd1;
 
 		case (top_state)
+
 		S_IDLE: begin
+
 			VGA_enable <= 1'b1;   
+
 			if (~UART_RX_I | PB_pushed[0]) begin
 				// UART detected a signal, or PB0 is pressed
 				UART_rx_initialize <= 1'b1;
@@ -221,29 +232,38 @@ always @(posedge CLOCK_50_I or negedge resetn) begin
 								
 				top_state <= S_ENABLE_UART_RX;
 			end
+
 `ifdef SIMULATION
+
 			if (UART_timer == 26'd10) begin
-				m1_start_bit <= 1'b1;
-				top_state <= S_top_m1;
+				m2_start <= 1'b1;
+				top_state <= S_top_m2;
 			end
+
 `endif
+
 		end
+
 		S_ENABLE_UART_RX: begin
 			// Enable the UART receiver
 			UART_rx_enable <= 1'b1;
 			top_state <= S_WAIT_UART_RX;
 		end
+
 		S_WAIT_UART_RX: begin
+
 			if ((UART_timer == 26'd49999999) && (UART_SRAM_address != 18'h00000)) begin
 				// Timeout for 1 sec on UART for detecting if file transmission is finished
 				UART_rx_initialize <= 1'b1;
 				 				
-				m1_start_bit <= 1'b1;
-				top_state <= S_top_m1;
+				m2_start <= 1'b1;
+				top_state <= S_top_m2;
+				VGA_enable <= 1'b0;
 			end
 		end
 
 		S_top_m1: begin
+		
 			m1_start_bit <= 1'b0;
 			
 			if (m1_finish) begin
@@ -253,6 +273,20 @@ always @(posedge CLOCK_50_I or negedge resetn) begin
 			
 		end
 		
+//never goes here, will instantiate later		
+		S_top_m2: begin
+		
+			m2_start <= 1'b0;
+			
+			if (m2_finish) begin
+`ifdef SIMULATION
+				top_state <= S_IDLE;
+`endif
+				top_state <= S_top_m1;
+			end
+			
+		end
+///////////////////////	
 		default: top_state <= S_IDLE;
 		endcase
 	end
@@ -263,13 +297,13 @@ assign VGA_base_address = 18'd146944;
 // Give access to SRAM for UART and VGA at appropriate time
 assign SRAM_address = ((top_state == S_ENABLE_UART_RX) | (top_state == S_WAIT_UART_RX)) 
 						? UART_SRAM_address : (top_state == S_top_m1)  ? m1_address
-						: VGA_SRAM_address;
+						: ((top_state == S_top_m2)  ? m2_address : VGA_SRAM_address);
 
-assign SRAM_write_data = (top_state == S_top_m1)  ? m1_write_data : UART_SRAM_write_data;
+assign SRAM_write_data = (top_state == S_top_m1) ? m1_write_data : ((top_state == S_top_m2) ? m2_write_data : UART_SRAM_write_data);
 
 assign SRAM_we_n = ((top_state == S_ENABLE_UART_RX) | (top_state == S_WAIT_UART_RX)) 
 						? UART_SRAM_we_n  : (top_state == S_top_m1)  ? m1_write_en_n
-						: 1'b1;
+						: (top_state == S_top_m2 ? m2_write_en_n : 1'b1);
 
 // 7 segment displays
 convert_hex_to_seven_segment unit7 (

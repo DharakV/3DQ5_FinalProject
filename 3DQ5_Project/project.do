@@ -15,6 +15,9 @@ vmap work rtl_work
 # insert files specific to your design here
 
 vlog -sv -work rtl_work +define+DISABLE_DEFAULT_NET milestone1.v
+vlog -sv -work rtl_work +define+DISABLE_DEFAULT_NET milestone2.v
+vlog -sv -work rtl_work +define+DISABLE_DEFAULT_NET dual_port_RAM0.v
+vlog -sv -work rtl_work +define+DISABLE_DEFAULT_NET dual_port_RAM1.v
 vlog -sv -work rtl_work +define+DISABLE_DEFAULT_NET convert_hex_to_seven_segment.v
 vlog -sv -work rtl_work +define+DISABLE_DEFAULT_NET VGA_Controller.v
 vlog -sv -work rtl_work +define+DISABLE_DEFAULT_NET PB_Controller.v

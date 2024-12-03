@@ -1,0 +1,5 @@
+PLL_Name	SRAM_Controller:SRAM_unit|Clock_100_PLL:Clock_100_PLL_inst|altpll:altpll_component|pll
+PLLJITTER	30
+PLLSPEmax	84
+PLLSPEmin	-53
+
